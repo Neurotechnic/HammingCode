@@ -1,0 +1,318 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Hamming(n,k) Step-by-Step Encoder</title>
+  <style>
+    /* Стили без изменений */
+    body { font-family: sans-serif; margin: 20px; background: #f8f8f8; }
+    h2 { margin-bottom: 0.5em; }
+    .input-section { margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ccc; display: flex; align-items: center; flex-wrap: wrap; }
+    .input-group { margin-right: 15px; margin-bottom: 10px; }
+    label { margin-right: 5px; font-weight: bold; }
+    input[type="text"] { width: 250px; font-size: 1rem; padding: 4px; }
+    input[type="number"] { width: 60px; font-size: 1rem; padding: 4px; }
+    .radio-group { margin-top: 8px; margin-right: 15px; margin-bottom: 10px; }
+    button { font-size: 1rem; padding: 6px 10px; cursor: pointer; margin-bottom: 10px; }
+    #output { margin-top: 20px; }
+    .block-container { position: relative; width: 95%; min-height: 250px; height: auto; margin: 20px 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; display: flex; }
+    .diagram-panel { position: relative; flex: 1 1 500px; min-width: 450px; border-right: 1px solid #ccc; padding-bottom: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; padding: 10px; }
+    .text-panel { flex: 1 1 300px; padding: 10px; font-family: monospace; font-size: 0.95rem; overflow-y: auto; }
+    .title { font-weight: bold; margin: 5px 10px 15px 0; width: 100%; text-align: center; }
+    .bit-box { position: relative; width: 35px; height: 35px; background: #eee; border-radius: 4px; border: 1px solid #999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; transition: background 0.2s; margin: 5px; font-size: 0.8rem; }
+    .bit-box .bit-pos { font-size: 0.6rem; color: #555; margin-top: -2px; }
+    .bit-box .bit-val { font-size: 0.9rem; font-weight: bold; }
+    .bit-box.data { background: #e0e0ff; }
+    .bit-box.parity { background: #f0f0f0; border-width: 2px; }
+    .bit-box[data-parity-pos='1'] { color: red; border-color: #f33; background: #fee; }
+    .bit-box[data-parity-pos='2'] { color: green; border-color: #3a3; background: #efe; }
+    .bit-box[data-parity-pos='4'] { color: blue; border-color: #33f; background: #eef; }
+    .bit-box[data-parity-pos='8'] { color: orange; border-color: #fa0; background: #ffe; }
+    .bit-box[data-parity-pos='16'] { color: purple; border-color: #a3a; background: #fef; }
+    .step-desc[data-parity-pos='1'] { color: red; border-left-color: #f33; }
+    .step-desc[data-parity-pos='2'] { color: green; border-left-color: #3a3; }
+    .step-desc[data-parity-pos='4'] { color: blue; border-left-color: #33f; }
+    .step-desc[data-parity-pos='8'] { color: orange; border-left-color: #fa0; }
+    .step-desc[data-parity-pos='16'] { color: purple; border-left-color: #a3a; }
+    .step-desc { background: #f5f5f5; border-left: 3px solid #666; margin-bottom: 6px; padding: 4px 8px; opacity: 0; transition: opacity 0.25s, background-color 0.15s; font-size: 0.9rem; }
+    .step-desc.visible { opacity: 1; }
+    .step-desc.highlight { background-color: #ffffdd; }
+    #finalEncoded { margin-top: 30px; font-family: monospace; font-size: 1rem; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 6px; word-wrap: break-word; }
+    .final-bit { display: inline-block; text-align: center; min-width: 1.1em; padding: 0 1px; }
+    .final-p1 { color: red; font-weight: bold; }
+    .final-p2 { color: green; font-weight: bold; }
+    .final-p4 { color: blue; font-weight: bold; }
+    .final-p8 { color: orange; font-weight: bold; }
+    .final-p16 { color: purple; font-weight: bold; }
+    .final-parity-default { color: magenta; font-weight: bold; }
+    #error-message { color: red; font-weight: bold; margin-top: 10px; }
+    .bit-box.highlight-parity { background-color: #ffff99 !important; }
+    .bit-box.highlight-data { background-color: #ccffcc !important; }
+  </style>
+</head>
+<body>
+
+<h2>Hamming(n,k) Step-by-Step Encoder</h2>
+
+<div class="input-section">
+  <div class="input-group">
+      <label for="kValue">Data bits (k):</label>
+      <input type="number" id="kValue" value="4" min="2" max="25" step="1" />
+  </div>
+
+  <div class="input-group">
+      <label for="animationSpeedInput">Animation speed (ms):</label>
+      <input type="number" id="animationSpeedInput" value="100" min="10" step="10" />
+  </div>
+
+  <div class="input-group">
+    <label for="binaryInput">Binary Input:</label>
+    <input type="text" id="binaryInput" placeholder="e.g. 1101..." value="1010110001110010110101010001110100100111101110000100111011100001" />
+  </div>
+
+  <div class="radio-group">
+    <label><input type="radio" name="padding" value="start" checked> Pad at start</label>
+    <label><input type="radio" name="padding" value="end"> Pad at end</label>
+  </div>
+
+  <button onclick="startEncoding()">Encode</button>
+</div>
+
+<div id="error-message"></div>
+<div id="output"></div>
+<div id="finalEncoded"></div>
+
+<script>
+  // --- Глобальные переменные ---
+  let k = 0, m = 0, n = 0;
+  let parityPositions = [], dataPositions = [];
+  let bitElements = {};
+
+  // --- Функция для вычисления m и n на основе k ---
+  function calculateHammingParams(k_input) {
+    k = parseInt(k_input);
+    if (isNaN(k) || k < 2) {
+        throw new Error("Number of data bits (k) must be at least 2.");
+    }
+    m = 0;
+    while (Math.pow(2, m) < k + m + 1) m++;
+    n = k + m;
+    parityPositions = [];
+    dataPositions = [];
+    for (let pos = 1; pos <= n; pos++) {
+      if ((pos & (pos - 1)) === 0) parityPositions.push(pos);
+      else dataPositions.push(pos);
+    }
+     if (dataPositions.length !== k || parityPositions.length !== m) {
+         console.error(`Position calculation error: k=${k}, m=${m}, found d=${dataPositions.length}, p=${parityPositions.length}`);
+         throw new Error("Internal error calculating bit positions.");
+     }
+  }
+
+  // --- Основная функция кодирования ---
+  async function startEncoding() {
+    const k_input = document.getElementById("kValue").value;
+    const input = document.getElementById("binaryInput").value.replace(/\s+/g, '');
+    const animationSpeedInput = document.getElementById("animationSpeedInput");
+    let animationSpeed = parseInt(animationSpeedInput.value);
+
+    if (isNaN(animationSpeed) || animationSpeed < 10) {
+        animationSpeed = 100;
+        animationSpeedInput.value = animationSpeed;
+    }
+
+    const output = document.getElementById("output");
+    const finalOutput = document.getElementById("finalEncoded");
+    const errorMsg = document.getElementById("error-message");
+
+    output.innerHTML = "";
+    finalOutput.innerHTML = "";
+    errorMsg.textContent = "";
+    bitElements = {};
+
+    try {
+        calculateHammingParams(k_input);
+
+        if (!/^[01]+$/.test(input) && input.length > 0) throw new Error("Please enter a valid binary string (only 0s and 1s).");
+        if (input.length === 0) throw new Error("Please enter a binary string.");
+
+        const paddingOption = document.querySelector('input[name="padding"]:checked').value;
+        let padded = input;
+        const remainder = padded.length % k;
+        if (remainder !== 0) {
+          const needed = k - remainder;
+          padded = (paddingOption === "start") ? "0".repeat(needed) + padded : padded + "0".repeat(needed);
+        }
+
+        let allEncodedBits = [];
+
+        for (let i = 0; i < padded.length; i += k) {
+          const blockIndex = i / k;
+          const dataBits = padded.substr(i, k).split('').map(Number);
+
+          const blockContainer = document.createElement("div");
+          blockContainer.className = "block-container";
+          const diagram = document.createElement("div");
+          diagram.className = "diagram-panel";
+          const textPanel = document.createElement("div");
+          textPanel.className = "text-panel";
+          blockContainer.appendChild(diagram);
+          blockContainer.appendChild(textPanel);
+          output.appendChild(blockContainer);
+
+          const title = document.createElement("div");
+          title.className = "title";
+          title.textContent = `Block #${blockIndex + 1}: Data [${dataBits.join('')}] (k=${k}, m=${m}, n=${n})`;
+          diagram.appendChild(title);
+
+          let encodedBlock = new Array(n).fill(null);
+          let dataBitIndex = 0;
+          let textHTML = `<div><strong>Data:</strong> ${dataBits.map((d, idx) => `d${idx+1}=${d}`).join(', ')}</div><hr>`;
+          let parityFormulas = {};
+          let calculatedParityBits = {};
+
+          for (let pos = 1; pos <= n; pos++) {
+              const isParityPos = parityPositions.includes(pos);
+              let bitValue = '?';
+              let bitTypeClass = '';
+              let bitDataAttr = '';
+              if (isParityPos) {
+                  bitTypeClass = 'parity';
+                  bitDataAttr = `data-parity-pos="${pos}"`;
+              } else {
+                  bitTypeClass = 'data';
+                  bitValue = dataBits[dataBitIndex];
+                  encodedBlock[pos - 1] = bitValue;
+                  dataBitIndex++;
+              }
+              const bitBox = createBitBox(pos, bitValue, bitTypeClass, bitDataAttr);
+              diagram.appendChild(bitBox);
+              bitElements[`${blockIndex}_${pos}`] = bitBox;
+          }
+
+          for (const p_pos of parityPositions) {
+            let parityValue = 0;
+            let formulaParts = [];
+            let dataBitsToCheck = [];
+            for(let d_idx = 0; d_idx < k; d_idx++) {
+                const d_val = dataBits[d_idx];
+                const d_pos = dataPositions[d_idx];
+                if ((d_pos & p_pos) !== 0) {
+                    parityValue ^= d_val;
+                    formulaParts.push(`d${d_idx + 1}`);
+                    dataBitsToCheck.push(d_pos);
+                }
+            }
+            encodedBlock[p_pos - 1] = parityValue;
+            calculatedParityBits[p_pos] = parityValue;
+            const formulaStr = formulaParts.length > 0 ? formulaParts.join(' ⊕ ') : '0';
+            const formulaVals = formulaParts.map(d_label => dataBits[parseInt(d_label.substring(1)) - 1]);
+            const formulaFullStr = formulaVals.length > 0 ? formulaVals.join(' ⊕ ') : '0';
+            const stepId = `pdesc-${blockIndex}-${p_pos}`;
+            parityFormulas[p_pos] = {
+                id: stepId,
+                html: `<div class="step-desc" id="${stepId}" data-parity-pos="${p_pos}">
+                         p<sub>${p_pos}</sub> = ${formulaStr} = ${formulaFullStr} = <b>${parityValue}</b>
+                       </div>`,
+                bitsToCheck: dataBitsToCheck
+            };
+             textHTML += parityFormulas[p_pos].html;
+          }
+
+          const finalEncodedBlockId = `encode-${blockIndex}`;
+          textHTML += `<hr><div class="step-desc" id="${finalEncodedBlockId}">
+                         Encoded (${n} bits):
+                         <span class="final-encoded-bits">${buildColoredN(encodedBlock, parityPositions)}</span>
+                       </div>`;
+          textPanel.innerHTML = textHTML;
+
+          await delay(animationSpeed * 0.5); // Используем переменную скорости
+
+          for (const p_pos of parityPositions) {
+            const formulaInfo = parityFormulas[p_pos];
+            const stepElem = document.getElementById(formulaInfo.id);
+            const p_bitBox = bitElements[`${blockIndex}_${p_pos}`];
+
+            if(stepElem) stepElem.classList.add("visible", "highlight");
+            if (p_bitBox) p_bitBox.classList.add("highlight-parity");
+            formulaInfo.bitsToCheck.forEach(d_pos => {
+                const d_bitBox = bitElements[`${blockIndex}_${d_pos}`];
+                if (d_bitBox) d_bitBox.classList.add("highlight-data");
+            });
+
+            await delay(animationSpeed * (1.0 + k * 0.02)); // Используем переменную скорости
+
+            if (p_bitBox) {
+                 const valElement = p_bitBox.querySelector('.bit-val');
+                 if (valElement) valElement.textContent = calculatedParityBits[p_pos];
+            }
+
+            await delay(animationSpeed * 0.5); // Используем переменную скорости
+
+            if(stepElem) stepElem.classList.remove("highlight");
+            if (p_bitBox) p_bitBox.classList.remove("highlight-parity");
+             formulaInfo.bitsToCheck.forEach(d_pos => {
+                 const d_bitBox = bitElements[`${blockIndex}_${d_pos}`];
+                 if (d_bitBox) d_bitBox.classList.remove("highlight-data");
+             });
+             await delay(animationSpeed * 0.3); // Используем переменную скорости
+          }
+
+          const finalEncodeElem = document.getElementById(finalEncodedBlockId);
+          if(finalEncodeElem) finalEncodeElem.classList.add("visible");
+          allEncodedBits.push(...encodedBlock);
+
+          await delay(animationSpeed * 0.8); // Используем переменную скорости
+
+        } // --- Конец цикла по блокам ---
+
+        let finalStrHtml = "";
+        for (let b = 0; b < allEncodedBits.length; b += n) {
+          const blockN = allEncodedBits.slice(b, b + n);
+          finalStrHtml += buildColoredN(blockN, parityPositions) + " ";
+        }
+
+        finalOutput.innerHTML = `
+          <div><strong>Final encoded message (${allEncodedBits.length} bits):</strong></div>
+          <div style="font-family:monospace; font-size:1.1rem;">${finalStrHtml.trim()}</div>
+        `;
+
+    } catch (error) {
+        console.error("Encoding error:", error);
+        errorMsg.textContent = `Error: ${error.message}`;
+    }
+  }
+
+  // --- Вспомогательные функции ---
+  function createBitBox(position, value, classNames, dataAttribute) {
+    const box = document.createElement("div");
+    box.className = `bit-box ${classNames}`;
+    if (dataAttribute) {
+        const parts = dataAttribute.split('=');
+        box.setAttribute(parts[0], parts[1].replace(/"/g, ''));
+    }
+    box.innerHTML = `<span class="bit-val">${value}</span><span class="bit-pos">(${position})</span>`;
+    return box;
+  }
+
+  function buildColoredN(bits, p_positions) {
+    const colorClasses = { 1: 'final-p1', 2: 'final-p2', 4: 'final-p4', 8: 'final-p8', 16: 'final-p16' };
+    return bits.map((bit, idx) => {
+      const position = idx + 1;
+      let className = 'final-bit';
+      if (p_positions.includes(position)) {
+         className += ` ${colorClasses[position] || 'final-parity-default'}`;
+      }
+      const displayBit = (bit === null || typeof bit === 'undefined') ? '?' : bit;
+      return `<span class="${className}">${displayBit}</span>`;
+    }).join("");
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+  }
+
+</script>
+
+</body>
+</html>
