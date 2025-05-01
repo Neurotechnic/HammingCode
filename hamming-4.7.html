@@ -1,0 +1,431 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hamming(7,4) Step-by-Step</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      background: #f8f8f8;
+    }
+    h2 {
+      margin-bottom: 0.5em;
+    }
+    .input-section {
+      margin-bottom: 20px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .radio-group {
+      margin-top: 8px;
+    }
+    input[type="text"] {
+      width: 280px;
+      font-size: 1rem;
+      padding: 4px;
+    }
+    button {
+      font-size: 1rem;
+      padding: 6px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+    #output {
+      margin-top: 20px;
+    }
+
+    /* ---------- BLOCK CONTAINER ---------- */
+    .block-container {
+      position: relative;
+      width: 800px;      
+      height: 220px;     
+      margin: 20px 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      overflow: hidden;
+      display: flex; /* Левая панель (диаграмма) + правая панель (шаги) */
+    }
+
+    /* Левая половина (диаграмма) */
+    .diagram-panel {
+      position: relative;
+      flex: 0 0 400px; /* фиксированная ширина диаграммы */
+      border-right: 1px solid #ccc;
+    }
+
+    /* Правая половина (шаги и формулы) */
+    .text-panel {
+      flex: 1; 
+      padding: 10px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      overflow-y: auto;
+    }
+
+    .title {
+      font-weight: bold;
+      margin: 5px 10px;
+    }
+
+    /* ---------- Биты ---------- */
+    .bit-box {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      background: #eee;
+      border-radius: 4px;
+      border: 1px solid #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    .bit-box.data {
+      background: #eee;
+    }
+    .bit-box.parity {
+      /* Было зелёное, теперь общий стиль чуть нейтральный */
+      background: #f0f0f0;
+    }
+
+    /*
+      Специальные классы, отражающие цвет Parity-бита:
+      p1 → красный, p2 → зелёный, p3 → синий
+    */
+    .bit-box.p1 {
+      color: red; 
+      font-weight: 900;     /* ещё более жирное */
+      border-color: #f33;   /* рамка немного краснее */
+      background: #fee;     /* светло-красный фон, если хотите */
+    }
+    .bit-box.p2 {
+      color: green;
+      font-weight: 900;
+      border-color: #3a3;
+      background: #efe; 
+    }
+    .bit-box.p3 {
+      color: blue;
+      font-weight: 900;
+      border-color: #33f;
+      background: #eef;
+    }
+    [id^="p1desc-"] {
+      color: red;
+    }
+    [id^="p2desc-"] {
+      color: green;
+    }
+    [id^="p3desc-"] {
+      color: blue;
+    }
+    /* ---------- SVG Линии ---------- */
+    .lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 400px;
+      height: 220px;
+    }
+    line.arrow {
+      stroke-width: 2;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    line.arrow.visible {
+      opacity: 1;
+    }
+    /* Цветовые классы для разных Parity-линий */
+    line.arrowP1 { stroke: red; }
+    line.arrowP2 { stroke: green; }
+    line.arrowP3 { stroke: blue; }
+
+    /* ---------- Шаги (формулы) ---------- */
+    .step-desc {
+      background: #f5f5f5;
+      border-left: 3px solid #666;
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      /* Шаги НЕ скрываем */
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .step-desc.visible {
+      opacity: 1;
+    }
+
+    /* ---------- Финальный результат ---------- */
+    #finalEncoded {
+      margin-top: 30px;
+      font-family: monospace;
+      font-size: 1rem;
+      background: #fff;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Hamming(7,4) Step-by-Step</h2>
+
+<div class="input-section">
+  <label for="binaryInput">Binary Input:</label>
+  <input type="text" id="binaryInput" placeholder="e.g. 110100111..." />
+
+  <div class="radio-group">
+    <label><input type="radio" name="padding" value="start" checked> Pad at start (leading zeros)</label>
+    <label><input type="radio" name="padding" value="end"> Pad at end (trailing zeros)</label>
+  </div>
+
+  <button onclick="startEncoding()">Go</button>
+</div>
+
+<div id="output"></div>
+<div id="finalEncoded"></div>
+
+<!-- Маркер для кончика стрелки (красный) -->
+<svg style="height: 0; width: 0;">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="2" refY="2"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,4 L4,2 z" fill="red" />
+    </marker>
+  </defs>
+</svg>
+
+<script>
+  async function startEncoding() {
+    const input = document.getElementById("binaryInput").value.replace(/\s+/g, '');
+    const output = document.getElementById("output");
+    output.innerHTML = "";
+    const finalOutput = document.getElementById("finalEncoded");
+    finalOutput.innerHTML = "";
+
+    // Проверка, что только 0 или 1
+    if (!/^[01]+$/.test(input)) {
+      output.innerHTML = "<p style='color:red'>Please enter a binary string (only 0s and 1s).</p>";
+      return;
+    }
+
+    // Узнаём, куда дополнять нули
+    const paddingOption = document.querySelector('input[name="padding"]:checked').value;
+
+    // Дополняем двоичную строку до кратности 4
+    let padded = input;
+    const remainder = padded.length % 4;
+    if (remainder !== 0) {
+      const needed = 4 - remainder;
+      if (paddingOption === "start") {
+        padded = "0".repeat(needed) + padded;
+      } else {
+        padded = padded + "0".repeat(needed);
+      }
+    }
+
+    // Скопим все 7-битные блоки для финального вывода
+    let allEncodedBits = [];
+
+    // Разбиваем по 4 бита
+    for (let i = 0; i < padded.length; i += 4) {
+      const d1 = parseInt(padded[i]);
+      const d2 = parseInt(padded[i + 1]);
+      const d3 = parseInt(padded[i + 2]);
+      const d4 = parseInt(padded[i + 3]);
+
+      // Считаем биты четности по Hamming(7,4)
+      const p1 = d1 ^ d2 ^ d4;
+      const p2 = d1 ^ d3 ^ d4;
+      const p3 = d2 ^ d3 ^ d4;
+
+      // Итоговый 7-битный блок (p1 p2 d1 p3 d2 d3 d4)
+      const encodedBlock = [p1, p2, d1, p3, d2, d3, d4];
+      allEncodedBits.push(...encodedBlock);
+
+      // ---------- Создаём контейнер для блока ----------
+      const blockContainer = document.createElement("div");
+      blockContainer.className = "block-container";
+
+      // Левая панель (диаграмма) + правая панель (шаги)
+      const diagram = document.createElement("div");
+      diagram.className = "diagram-panel";
+      const textPanel = document.createElement("div");
+      textPanel.className = "text-panel";
+
+      blockContainer.appendChild(diagram);
+      blockContainer.appendChild(textPanel);
+
+      // Заголовок
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = `Block #${(i/4)+1}: d1=${d1}, d2=${d2}, d3=${d3}, d4=${d4}`;
+      diagram.appendChild(title);
+
+      output.appendChild(blockContainer);
+
+      // Создаём SVG для стрелочек
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "lines");
+      diagram.appendChild(svg);
+
+      // Создаём боксы для битов:
+      // d1..d4 (сверху), p1..p3 (снизу) – и даём им классы p1/p2/p3
+      const d1Box = createBitBox(d1, "data",  20,  60);  // data-бит
+      const d2Box = createBitBox(d2, "data", 120,  60);
+      const d3Box = createBitBox(d3, "data", 220,  60);
+      const d4Box = createBitBox(d4, "data", 320,  60);
+
+      // Parity-биты: p1-красный, p2-зелёный, p3-синий
+      const p1Box = createBitBox("?", "parity p1",  20, 140);
+      const p2Box = createBitBox("?", "parity p2", 120, 140);
+      const p3Box = createBitBox("?", "parity p3", 320, 140);
+
+      diagram.appendChild(d1Box);
+      diagram.appendChild(d2Box);
+      diagram.appendChild(d3Box);
+      diagram.appendChild(d4Box);
+      diagram.appendChild(p1Box);
+      diagram.appendChild(p2Box);
+      diagram.appendChild(p3Box);
+
+      // Линии-стрелочки (разные цвета)
+      const linesP1 = [
+        createArrow(svg, d1Box, p1Box, "arrowP1"),
+        createArrow(svg, d2Box, p1Box, "arrowP1"),
+        createArrow(svg, d4Box, p1Box, "arrowP1"),
+      ];
+      const linesP2 = [
+        createArrow(svg, d1Box, p2Box, "arrowP2"),
+        createArrow(svg, d3Box, p2Box, "arrowP2"),
+        createArrow(svg, d4Box, p2Box, "arrowP2"),
+      ];
+      const linesP3 = [
+        createArrow(svg, d2Box, p3Box, "arrowP3"),
+        createArrow(svg, d3Box, p3Box, "arrowP3"),
+        createArrow(svg, d4Box, p3Box, "arrowP3"),
+      ];
+
+      // ---------- Правая панель (формулы) ----------
+      const textHTML = `
+        <div><strong>Data:</strong> d1=${d1}, d2=${d2}, d3=${d3}, d4=${d4}</div>
+        <div class="step-desc" id="p1desc-${i}">
+          p1 = d1 ⊕ d2 ⊕ d4 = ${d1} ⊕ ${d2} ⊕ ${d4} = ${p1}
+        </div>
+        <div class="step-desc" id="p2desc-${i}">
+          p2 = d1 ⊕ d3 ⊕ d4 = ${d1} ⊕ ${d3} ⊕ ${d4} = ${p2}
+        </div>
+        <div class="step-desc" id="p3desc-${i}">
+          p3 = d2 ⊕ d3 ⊕ d4 = ${d2} ⊕ ${d3} ⊕ ${d4} = ${p3}
+        </div>
+        <div class="step-desc" id="encode-${i}">
+          Encoded: 
+          <!-- p1 (красный), p2 (зелёный), d1, p3 (синий), d2, d3, d4 -->
+          ${buildColored7([p1, p2, d1, p3, d2, d3, d4])}
+        </div>
+      `;
+      textPanel.innerHTML = textHTML;
+
+      // Пошаговый показ
+      await showStep(linesP1, `p1desc-${i}`);
+      p1Box.textContent = p1;
+
+      await showStep(linesP2, `p2desc-${i}`);
+      p2Box.textContent = p2;
+
+      await showStep(linesP3, `p3desc-${i}`);
+      p3Box.textContent = p3;
+
+      // Показываем финальную строку "Encoded"
+      const encodeElem = document.getElementById(`encode-${i}`);
+      encodeElem.classList.add("visible");
+
+      // Небольшая пауза
+      await delay(600);
+    }
+
+    // ---------- После всех блоков: финальная строка ----------
+    // В каждом 7-битном блоке: p1 (красный), p2 (зелёный), p3 (синий).
+    let finalStrHtml = "";
+    for (let b = 0; b < allEncodedBits.length; b += 7) {
+      const block7 = allEncodedBits.slice(b, b + 7);
+      finalStrHtml += buildColored7(block7) + " ";
+    }
+
+    finalOutput.innerHTML = `
+      <div><strong>Final encoded message:</strong></div>
+      <div style="font-family:monospace; font-size:1.2rem;">${finalStrHtml.trim()}</div>
+    `;
+  }
+
+  // ------------------ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ------------------
+
+  // Показываем линии + шаг (не скрываем их потом)
+  async function showStep(lines, stepId) {
+    lines.forEach(line => line.classList.add("visible"));
+    const desc = document.getElementById(stepId);
+    desc.classList.add("visible");
+    await delay(1200);
+  }
+
+  // Создаём div для битового значения
+  function createBitBox(value, classNames, x, y) {
+    const box = document.createElement("div");
+    box.className = `bit-box ${classNames}`; 
+    box.style.left = x + "px";
+    box.style.top = y + "px";
+    box.textContent = value;
+    return box;
+  }
+
+  // Создаём линию <line> с нужным классом (arrowP1 / arrowP2 / arrowP3)
+  function createArrow(svg, srcBox, dstBox, colorClass) {
+    const srcRect = {x: parseInt(srcBox.style.left), y: parseInt(srcBox.style.top), w: 32, h: 32};
+    const dstRect = {x: parseInt(dstBox.style.left), y: parseInt(dstBox.style.top), w: 32, h: 32};
+
+    const x1 = srcRect.x + srcRect.w / 2;
+    const y1 = srcRect.y + srcRect.h / 2;
+    const x2 = dstRect.x + dstRect.w / 2;
+    const y2 = dstRect.y + dstRect.h / 2;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("class", `arrow ${colorClass}`); 
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    svg.appendChild(line);
+
+    return line;
+  }
+
+  // Возвращает HTML-строку 7 бит, где p1 (индекс 0) красный/жирный, p2 (1) зелёный, p3 (3) синий
+  function buildColored7(bits) {
+    /* bits[0]=p1, bits[1]=p2, bits[2]=d1, bits[3]=p3, bits[4]=d2, bits[5]=d3, bits[6]=d4 */
+    return bits.map((bit, idx) => {
+      switch (idx) {
+        case 0: // p1
+          return `<span style="color:red;font-weight:bold;">${bit}</span>`;
+        case 1: // p2
+          return `<span style="color:green;font-weight:bold;">${bit}</span>`;
+        case 3: // p3
+          return `<span style="color:blue;font-weight:bold;">${bit}</span>`;
+        default:
+          return bit;
+      }
+    }).join("");
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+</script>
+
+</body>
+</html>
